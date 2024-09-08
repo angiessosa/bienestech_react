@@ -55,11 +55,3 @@ def login_user(user: UsuarioLogin, db: Session = Depends(get_db)):
         raise HTTPException(status_code=401, detail="Credenciales incorrectas")
     
     return {"message": "Login exitoso", "rol": db_user.idRol, "nombres": db_user.nombres}  # Incluye los nombres
-
-
-
-
-#Agendamiento de taller
-
-@router.post("/agendarTaller")
-def agendar_taller(agendar_taller: TallerCreate, db: Session = Depends
