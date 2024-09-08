@@ -1,5 +1,6 @@
 from datetime import datetime
 from pydantic import BaseModel
+from typing import Optional
 
 class UsuarioCreate(BaseModel):
     tipoDocumento: str
@@ -14,16 +15,39 @@ class UsuarioLogin(BaseModel):
     numeroDocumento: str
     claveUsuario: str  # Cambiado a claveUsuario
 
+
+class HorarioFichaBase(BaseModel):
+    trimestre: int
+    numAmbiente: str
+    dia: str
+    horaInicio: datetime
+    horaFin: datetime
+    jornadaFicha: str
+    sede: str
+    idFicha: int
+
 class TallerCreate(BaseModel):
     fechaYHora: datetime
-    numFicha: str
-    tema: str
+    idCentro: int
+    idJornada: int
+    idCoordinacion: int
+    idFicha: int
+    idTematica: int
+    idUsuario: int
     observaciones: str
-    idUsuario: int # Añadido para asociar al profesional
 
-class Taller(TallerCreate):
+class Coordinacion(BaseModel):
     id: int
+    nombre: str
 
-    class Config:
-        orm_mode = True
+class Ficha(BaseModel):
+    numero: str
 
+class Tema(BaseModel):
+    id: int
+    nombre: str
+
+class Horario(BaseModel):
+    ficha: str
+    horaInicio: str
+    horaFin: str
