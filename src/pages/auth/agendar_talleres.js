@@ -6,9 +6,7 @@ import 'react-datepicker/dist/react-datepicker.css';
 import axios from 'axios';
 import Navbar from '../../components/navbar';
 import PiePagina from '../../components/piePagina';
-
 import "./admin.css";
-
 
 const AgendarTaller = () => {
     const [selectedDate, setSelectedDate] = useState(null);
@@ -22,6 +20,41 @@ const AgendarTaller = () => {
         profesional: '',
         observaciones: '',
     });
+    const [error, setError] = useState('');
+    const [horariosFicha, setHorariosFicha] = useState({});
+    const [datos, setDatos] = useState([]);
+
+    
+    const navigate = useNavigate();
+
+    useEffect(() => {
+        axios.all([
+            axios.get('http://localhost:8000/coordinaciones'),
+            axios.get('http://localhost:8000/fichas'),
+            axios.get('http://localhost:8000/temas'),
+            axios.get('http://localhost:8000/profesionales'),
+            axios.get('http://localhost:8000/horarios')
+        ]).then(axios.spread((coordinaciones, fichas, temas, profesionales, horarios) => {
+            console.log('Datos recibidos:', {
+                coordinaciones: coordinaciones.data,
+                fichas: fichas.data,
+                temas: temas.data,
+                profesionales: profesionales.data,
+                horarios: horarios.data
+            });
+            
+            setDatos({
+                coordinaciones: coordinaciones.data,
+                fichas: fichas.data,
+                temas: temas.data,
+                profesionales: profesionales.data,
+            });
+            setHorariosFicha(horarios.data);
+        })).catch(error => {
+            console.error('Error al obtener datos', error);
+        });
+    }, []);
+    
 
     const handleInputChange = (e) => {
         setTaller({ ...taller, [e.target.name]: e.target.value });
@@ -31,17 +64,47 @@ const AgendarTaller = () => {
         setSelectedDate(date);
     };
 
-
     const handleSubmit = (e) => {
         e.preventDefault();
 
-        const data = {
-            ...taller,
-            fechaTaller: selectedDate,
+        const horaDisponible = taller.horaDisponible;
+        const fechaTaller = selectedDate;
+        const fechaHora = `${horaDisponible}:00`;
+
+        if (!fechaTaller || !horaDisponible) {
+            setError('Por favor, seleccione todos los campos necesarios.');
+            return;
+        }
+
+        const { horaInicio, horaFin } = horariosFicha[taller.ficha] || {};
+
+        if (!horaInicio || !horaFin) {
+            setError('Horario de ficha no definido.');
+            return;
+        }
+
+        const validateTimeSlot = (horaInicio, horaFin, fechaHora) => {
+            const start = new Date(`1970-01-01T${horaInicio}:00`);
+            const end = new Date(`1970-01-01T${horaFin}:00`);
+            const tallerStart = new Date(`1970-01-01T${fechaHora}:00`);
+            const tallerEnd = new Date(tallerStart.getTime() + 30 * 60000); // Añadir 30 minutos
+
+            return tallerStart >= start && tallerEnd <= end;
         };
 
-        // Llamada al API para guardar el taller
-        axios.post('http://localhost:4000/talleres', data)
+        if (!validateTimeSlot(horaInicio, horaFin, fechaHora)) {
+            setError('La hora del taller no está dentro del rango permitido o se solapa con otro taller.');
+            return;
+        }
+
+        const data = {
+            ...taller,
+            fechaTaller: fechaTaller.toLocaleDateString('es-CO'),
+            horaInicio: fechaHora,
+            horaFin: new Date(new Date(fechaHora).getTime() + 30 * 60000).toTimeString().substr(0, 5), // Hora fin + 30 minutos
+        };
+
+        axios.post('http://localhost:8000/talleres/', data)
             .then(response => {
                 navigate('/agendado', { state: { taller: data } });
             })
@@ -49,9 +112,6 @@ const AgendarTaller = () => {
                 console.error('Hubo un error al guardar el taller', error);
             });
     };
-
-    const navigate = useNavigate();
-
 
     const handleLogout = () => {
         // Eliminar los datos de sesión almacenados en localStorage
@@ -64,13 +124,10 @@ const AgendarTaller = () => {
 
     return (
         <div className='agd-container'>
-
-            {/*Navbar*/}
             <Navbar handleLogout={handleLogout} />
-
             <div className="container mt-4">
                 <h2 className="mb-4 text-center h2A">Agendar Taller</h2>
-
+                {error && <div className="alert alert-danger">{error}</div>}
                 <Form onSubmit={handleSubmit} className='agendamiento'>
                     <Row className="mb-3">
                         <Form.Group as={Col} controlId="centroFormacion">
@@ -99,9 +156,13 @@ const AgendarTaller = () => {
                             <Form.Label>3. Coordinación</Form.Label>
                             <Form.Select className='opcion' name="coordinacion" onChange={handleInputChange} required>
                                 <option value="">Seleccione Coordinación</option>
-                                <option value="teleinformatica">Teleinformática</option>
-                                <option value="mercadeo">Mercadeo</option>
-                                <option value="logistica">Logística</option>
+                                {datos.coordinaciones && datos.coordinaciones.length > 0 ? (
+                                    datos.coordinaciones.map(coord => (
+                                        <option key={coord.id} value={coord.id}>{coord.nombre}</option>
+                                    ))
+                                ) : (
+                                    <option value="">No hay coordinaciones disponibles</option>
+                                )}
                             </Form.Select>
                         </Form.Group>
 
@@ -109,8 +170,13 @@ const AgendarTaller = () => {
                             <Form.Label>4. Ficha</Form.Label>
                             <Form.Select className='opcion' name="ficha" onChange={handleInputChange} required>
                                 <option value="">Seleccione Ficha</option>
-                                <option value="2898754">2898754</option>
-                                <option value="2470719">2470719</option>
+                                {datos.fichas && datos.fichas.length > 0 ? (
+                                    datos.fichas.map(ficha => (
+                                        <option key={ficha.id} value={ficha.id}>{ficha.numero}</option>
+                                    ))
+                                ) : (
+                                    <option value="">No hay fichas disponibles</option>
+                                )}
                             </Form.Select>
                         </Form.Group>
                     </Row>
@@ -120,9 +186,10 @@ const AgendarTaller = () => {
                             <Form.Label>5. Hora Disponible</Form.Label>
                             <Form.Select className='opcion' name="horaDisponible" onChange={handleInputChange} required>
                                 <option value="">Seleccione Hora</option>
-                                <option value="13:00">1:00pm</option>
-                                <option value="13:30">1:30pm</option>
-                                <option value="15:30">3:30pm</option>
+                                {/* Aquí debes proporcionar las horas disponibles como opciones */}
+                                {datos.horas.map(hora => (
+                                    <option key={hora} value={hora}>{hora}</option>
+                                ))}
                             </Form.Select>
                         </Form.Group>
 
@@ -130,24 +197,33 @@ const AgendarTaller = () => {
                             <Form.Label>6. Tema</Form.Label>
                             <Form.Select className='opcion' name="tema" onChange={handleInputChange} required>
                                 <option value="">Seleccione Tema</option>
-                                <option value="teatro">Teatro</option>
-                                <option value="musica">Música</option>
-                                <option value="danza">Danza</option>
+                                {datos.temas && datos.temas.length > 0 ? (
+                                    datos.temas.map(tema => (
+                                        <option key={tema.id} value={tema.id}>{tema.nombre}</option>
+                                    ))
+                                ) : (
+                                    <option value="">No hay temas disponibles</option>
+                                )}
                             </Form.Select>
                         </Form.Group>
                     </Row>
 
                     <Row className="mb-3">
                         <Form.Group as={Col} controlId="profesional">
-                            <Form.Label>7. Profesional</Form.Label>
-                            <Form.Select className='opcion' name="profesional" onChange={handleInputChange} required>
-                                <option value="">Seleccione Profesional</option>
-                                <option value="sebastianRamirez">Sebastián Ramírez</option>
-                            </Form.Select>
+                        <Form.Select className='opcion' name="profesional" onChange={handleInputChange} required>
+                            <option value="">Seleccione Profesional</option>
+                            {datos.profesionales && datos.profesionales.length > 0 ? (
+                                datos.profesionales.map(prof => (
+                                    <option key={prof.id} value={prof.id}>{prof.nombre}</option>
+                                ))
+                            ) : (
+                                <option value="">No hay profesionales disponibles</option>
+                            )}
+                        </Form.Select>
                         </Form.Group>
 
                         <Form.Group as={Col} controlId="fechaTaller">
-                            <Form.Label>8. Fecha </Form.Label>
+                            <Form.Label>8. Fecha</Form.Label>
                             <br></br>
                             <DatePicker
                                 selected={selectedDate}
