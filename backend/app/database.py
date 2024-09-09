@@ -1,13 +1,15 @@
 from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker, declarative_base
+from sqlalchemy.ext.declarative import declarative_base
+from sqlalchemy.orm import sessionmaker
 
-DATABASE_URL = "mysql+pymysql://root:@localhost/bienestech"  # Formato adecuado para MySQL y SQLAlchemy
+# Aquí configura tu cadena de conexión a la base de datos
+SQLALCHEMY_DATABASE_URL = "mysql+mysqlconnector://root:@localhost/bienestech"
 
-engine = create_engine(DATABASE_URL)
+engine = create_engine(SQLALCHEMY_DATABASE_URL)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
-
 Base = declarative_base()
 
+# Dependency para obtener una sesión de base de datos en cada request
 def get_db():
     db = SessionLocal()
     try:
