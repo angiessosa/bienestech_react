@@ -4,10 +4,10 @@ from fastapi.middleware.cors import CORSMiddleware
 
 app = FastAPI()
 
-# Habilitar CORS
+# Configurar CORS para permitir solicitudes desde el frontend
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # permitir todas las conexiones
+    allow_origins=["http://localhost:3000"],  # El origen del frontend
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
